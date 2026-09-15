@@ -20,6 +20,13 @@ public class Bloom
     internal bool Configured => _configured;
     internal bool HasBloom => _ultimateBloom != null;
 
+    // A map mod can graft an UltimateBloom purely so our constructor has something to find
+    // and then disable it, because it does not want the effect rendering on its own camera
+    // (Icebreaker does exactly this). A disabled MonoBehaviour never gets its Start called,
+    // so its serialized arrays stay null forever and TryConfigure can never finish. That is
+    // a deliberate arrangement, not a fault, and should not be reported as one.
+    internal bool Parked => _ultimateBloom != null && !_ultimateBloom.enabled;
+
     public Bloom()
     {
         // Find the main camera

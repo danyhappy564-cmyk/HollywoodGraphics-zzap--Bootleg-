@@ -259,6 +259,32 @@ _ultimateBloom.m_BloomUsages[0] = _ultimateBloom.m_BloomUsages[1] = false;  // �
   카메라를 못 찾으면 생성자가 일찍 리턴하는데, `GraphicsController` 의 `_bloom?.` 는
   **Bloom 객체**의 null만 막지 그 안의 `UltimateBloom` null은 못 막습니다
 
+### 후속 — "파킹된" 블룸은 실패가 아닙니다
+
+수정본을 실제로 돌린 로그에서 크래시는 사라졌고 **AO·모션블러·맵 설정이 살아났습니다**
+(전에는 같이 죽었습니다). 다만 블룸만은 끝내 설정이 안 됐습니다:
+
+```
+Bloom initialized
+Ambient Occlusion initialized
+Updated all settings
+[Error] Bloom: the camera's UltimateBloom still has no usable arrays after 120 frames
+```
+
+이건 타이밍 문제가 아니었습니다. 쇄빙선 쪽 로그가 답을 갖고 있습니다:
+
+```
+[CamDonor] UltimateBloom provisioned for HollywoodGraphics
+           (keeps its init alive; the renderer itself gets parked by the guard)
+```
+
+맵 모드가 **우리 생성자가 찾을 게 있으라고 컴포넌트를 심어놓고, 자기 카메라에서 그
+효과가 렌더링되는 건 원치 않아서 비활성화**해둔 겁니다. 비활성 MonoBehaviour는 `Start`
+가 영영 안 돌고, 그러면 배열도 영영 안 채워집니다. **의도된 배치지 고장이 아닙니다.**
+
+그래서 그 경우를 구분해서 `Error` 가 아니라 `Info` 로 남깁니다. 맵 모드 쪽은 이번에도
+안 건드렸습니다 — 고칠 게 없습니다.
+
 맵 모드 쪽은 건드리지 않았습니다. 이 수정은 쇄빙선뿐 아니라 자기 카메라를 쓰는
 어떤 커스텀 맵에도 그대로 적용됩니다.
 

@@ -108,11 +108,22 @@ public class GraphicsController : MonoBehaviour
             }
             else if (_bloomConfigureFrames == MaxBloomConfigureFrames)
             {
-                Plugin.Log.LogError(
-                    $"Bloom: the camera's UltimateBloom still has no usable intensity/usage "
-                    + $"arrays after {MaxBloomConfigureFrames} frames - bloom stays at its "
-                    + "defaults for this raid. Ambient occlusion and motion blur are "
-                    + "unaffected.");
+                if (_bloom.Parked)
+                {
+                    Plugin.Log.LogInfo(
+                        "Bloom: this camera's UltimateBloom is present but disabled, so it never "
+                        + "starts and never fills its arrays. That is the map deliberately opting "
+                        + "out of the effect - bloom is off here by design. Ambient occlusion and "
+                        + "motion blur are unaffected.");
+                }
+                else
+                {
+                    Plugin.Log.LogError(
+                        $"Bloom: the camera's UltimateBloom still has no usable intensity/usage "
+                        + $"arrays after {MaxBloomConfigureFrames} frames - bloom stays at its "
+                        + "defaults for this raid. Ambient occlusion and motion blur are "
+                        + "unaffected.");
+                }
             }
         }
 
