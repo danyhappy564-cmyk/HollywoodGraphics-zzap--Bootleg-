@@ -285,6 +285,25 @@ Updated all settings
 그래서 그 경우를 구분해서 `Error` 가 아니라 `Info` 로 남깁니다. 맵 모드 쪽은 이번에도
 안 건드렸습니다 — 고칠 게 없습니다.
 
+**실전 확인:** 수정 후 라이드 로그에 크래시가 사라지고 정상 경로가 전부 찍힙니다.
+`Error` 는 0건입니다.
+
+```
+Bloom initialized
+Ambient Occlusion initialized
+Updated all settings
+[Info] Bloom: this camera's UltimateBloom is present but disabled, so it never
+       starts and never fills its arrays. That is the map deliberately opting out ...
+```
+
+전에는 이 네 줄이 **하나도** 없었습니다. AO·모션블러가 블룸과 함께 죽어 있었다는 뜻이고,
+지금은 살아 있습니다.
+
+확인차 쇄빙선의 카메라 도너 JSON도 대조했습니다 — 거기 들어 있는 `UltimateBloom` 필드
+71개 중 **배열 필드(`m_BloomIntensities` / `m_BloomUsages` 등)는 하나도 없습니다.** 그래서
+그래프트만으로는 애초에 채워질 수 없었고, 파킹 여부와 무관하게 이 재시도 구조가
+필요했습니다.
+
 맵 모드 쪽은 건드리지 않았습니다. 이 수정은 쇄빙선뿐 아니라 자기 카메라를 쓰는
 어떤 커스텀 맵에도 그대로 적용됩니다.
 
