@@ -201,6 +201,67 @@ BSG가 다시 private으로 돌리면 **빌드 머신에서 컴파일 에러**�
 
 컴포넌트 자체를 못 찾는 경우는 원인도 대응도 다르므로 별도 경고를 남깁니다.
 
+## 커스텀 맵에서 모드 전체가 죽던 문제 (2026-09-15)
+
+쇄빙선(Icebreaker)에 들어가면 **HollywoodGraphics가 통째로 안 먹었습니다.** 블룸만이
+아니라 AO·모션블러·맵별 설정까지 전부입니다. 로그가 딱 거기서 끊깁니다:
+
+```
+[Info :Janky-HollywoodGraphics] Resetting Star Bloom intensities
+[Warning] FIRST Exception: NullReferenceException
+  HollywoodGraphics.Components.Bloom..ctor ()
+  HollywoodGraphics.GraphicsController.Start ()
+```
+
+같은 날 등대 로그에는 정상 경로가 그대로 찍혀 있어서 비교가 됩니다 —
+`Bloom: Ultimate Bloom effect applied to camera FPS Camera` → `Bloom initialized` →
+`Ambient Occlusion initialized` → `Updated all settings`. 쇄빙선 로그에는 이 네 줄이
+전부 없습니다.
+
+### 원인
+
+`Bloom` 생성자는 카메라에 `UltimateBloom` 이 없으면 `AddComponent` 로 붙입니다.
+그런데 **`AddComponent` 는 `Awake` 까지만 동기로 돌리고 `Start` 는 다음 프레임**이며,
+`UltimateBloom` 이 자기 배열들(`m_BloomIntensities`, `m_BloomUsages` 등)을 채우는 건
+`Start` 입니다. 그래서 갓 붙인 컴포넌트는 그 프레임에 배열이 전부 `null` 입니다.
+
+리테일 맵은 카메라 프리팹에 `UltimateBloom` 이 이미 직렬화돼 있어서 이 경로를 안
+탑니다. **자기 카메라를 직접 만드는 커스텀 맵**에서만 터집니다.
+
+`ResetIntensities` 에는 이미 `null` 가드가 있었습니다. 문제는 **그 바로 다음 줄**이고,
+거기엔 가드가 없었습니다:
+
+```csharp
+_ultimateBloom.m_BloomUsages[0] = _ultimateBloom.m_BloomUsages[1] = false;  // ← NRE
+```
+
+로그에 `Resetting ... intensities` 세 줄만 찍히고 그 아래 `Intensity: 1` 이 하나도
+안 찍힌 게 증거입니다 — 세 번 다 가드에 걸려서 바로 리턴했다는 뜻이고, 그럼 같은
+이유로 bool 배열도 `null` 입니다.
+
+### 고친 방식
+
+배열을 건드리는 설정을 생성자에서 **`TryConfigure()` 로 분리**하고, 아직 준비가 안 됐으면
+예외 대신 `false` 를 돌려주게 했습니다. `GraphicsController.Update()` 가 준비될 때까지
+다음 프레임에 다시 부릅니다(최대 120프레임, 보통 1~2프레임이면 끝납니다).
+
+- 리테일 맵: 생성자에서 첫 호출에 성공 → 재시도 코드는 한 번도 안 돎
+- 커스텀 맵: `UltimateBloom.Start()` 가 돈 다음 프레임에 성공하고 로그를 남김
+- 끝내 실패: **블룸만** 기본값으로 남고 AO·모션블러는 정상 동작, 에러 한 줄
+
+같이 손본 것:
+
+- `GraphicsController.Start()` 의 블룸·AO 초기화를 **각각 try/catch** 로 감쌌습니다.
+  이번 사고의 피해가 컸던 이유가 순차 실행이었기 때문입니다. 한 단계가 실패해도
+  나머지는 돌아야 합니다
+- `Bloom.UpdateSettings()` / `UpdateLensDust()` 에 `_ultimateBloom == null` 가드 추가.
+  `AmbientOcclusion.UpdateSettings()` 에는 원래 있던 가드고, 블룸 쪽에만 없었습니다.
+  카메라를 못 찾으면 생성자가 일찍 리턴하는데, `GraphicsController` 의 `_bloom?.` 는
+  **Bloom 객체**의 null만 막지 그 안의 `UltimateBloom` null은 못 막습니다
+
+맵 모드 쪽은 건드리지 않았습니다. 이 수정은 쇄빙선뿐 아니라 자기 카메라를 쓰는
+어떤 커스텀 맵에도 그대로 적용됩니다.
+
 ## 빌드 경로
 
 `SptRoot` 기본값을 SPT 4.1 설치본으로 바꾸고, 게임과 BepInEx 위치를 추측하지 않고

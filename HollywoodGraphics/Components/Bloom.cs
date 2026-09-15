@@ -10,9 +10,15 @@ namespace HollywoodGraphics.Components;
 public class Bloom
 {
     private float _sunLightFactor = 10000f;
-    
+
     private readonly UltimateBloom _ultimateBloom;
     private readonly WeatherController _weatherController;
+
+    // Configuration is split out of the constructor because it cannot always run in
+    // the constructor's frame. See TryConfigure.
+    private bool _configured;
+    internal bool Configured => _configured;
+    internal bool HasBloom => _ultimateBloom != null;
 
     public Bloom()
     {
@@ -35,11 +41,63 @@ public class Bloom
             Plugin.Log.LogInfo("Bloom: Added Ultimate Bloom component to camera");
         }
 
+        var weather = GameObject.Find("Weather");
+
+        if (weather != null)
+            _weatherController = weather.GetComponent<WeatherController>();
+
+        TryConfigure(camera.name);
+    }
+
+    // Apply the one-off setup that needs UltimateBloom's own serialized arrays, and say
+    // whether it actually happened.
+    //
+    // On a camera that already ships a fully-serialized UltimateBloom (every retail map)
+    // this succeeds on the first call from the constructor and nothing below ever runs
+    // again. On a camera that does NOT - a custom map that builds its own camera, where
+    // we AddComponent the effect ourselves - the arrays are still null in this frame,
+    // because AddComponent runs Awake but NOT Start, and Start is where UltimateBloom
+    // fills them. So there is nothing to configure yet.
+    //
+    // 2026-09-15 field log (Icebreaker) is what this is for. The three ResetIntensities
+    // calls logged their headers and returned on their own null guard, and then the very
+    // next statement - m_BloomUsages[0], which had no such guard - threw:
+    //
+    //   FIRST Exception: NullReferenceException
+    //     HollywoodGraphics.Components.Bloom..ctor ()
+    //     HollywoodGraphics.GraphicsController.Start ()
+    //
+    // That is not just bloom being lost. The throw escapes GraphicsController.Start(),
+    // so ambient occlusion, motion blur and the per-map settings never initialise
+    // either: one null array takes out the whole mod for the raid. The same raid's
+    // Lighthouse log shows the intended path for comparison ("Bloom: Ultimate Bloom
+    // effect applied to camera FPS Camera" / "Bloom initialized" / "Updated all
+    // settings"), which is exactly what the Icebreaker log is missing.
+    //
+    // So: report not-ready instead of throwing, and let GraphicsController call back on
+    // later frames until UltimateBloom has started.
+    internal bool TryConfigure(string cameraName = null)
+    {
+        if (_configured) return true;
+        if (_ultimateBloom == null) return false;
+
+        // These are assigned by value, not indexed, so they are safe whenever the
+        // component exists. Re-applying them on a retry is harmless.
         _ultimateBloom.m_IntensityManagement = UltimateBloom.BloomIntensityManagement.FilmicCurve;
         _ultimateBloom.m_SamplingMode = UltimateBloom.SamplingMode.HeightRelative;
         _ultimateBloom.m_SamplingMinHeight = 384;
         // Reduces flicker
         _ultimateBloom.m_AnamorphicSmallVerticalBlur = true;
+
+        // Everything from here down indexes into UltimateBloom's own arrays. Bail out
+        // as a whole rather than half-configuring: a retry re-runs all of it.
+        if (!Populated(_ultimateBloom.m_BloomIntensities) ||
+            !Populated(_ultimateBloom.m_AnamorphicBloomIntensities) ||
+            !Populated(_ultimateBloom.m_StarBloomIntensities) ||
+            !Populated(_ultimateBloom.m_BloomUsages, 2) ||
+            !Populated(_ultimateBloom.m_AnamorphicBloomUsages, 2) ||
+            !Populated(_ultimateBloom.m_StarBloomUsages))
+            return false;
 
         Plugin.Log.LogInfo("Resetting Main Bloom intensities");
         ResetIntensities(_ultimateBloom.m_BloomIntensities);
@@ -47,7 +105,7 @@ public class Bloom
         ResetIntensities(_ultimateBloom.m_AnamorphicBloomIntensities);
         Plugin.Log.LogInfo("Resetting Star Bloom intensities");
         ResetIntensities(_ultimateBloom.m_StarBloomIntensities);
-        
+
         // Turn these off as they form the "blob" part of the bloom and can oversaturate things.
         _ultimateBloom.m_BloomUsages[0] = _ultimateBloom.m_BloomUsages[1] = false;
         _ultimateBloom.m_AnamorphicBloomUsages[0] = false;
@@ -59,17 +117,24 @@ public class Bloom
         {
             _ultimateBloom.m_StarBloomUsages[i] = false;
         }
-        
+
+        _configured = true;
+
         UpdateSettings();
         UpdateLensDust();
-        Plugin.Log.LogInfo($"Bloom: Ultimate Bloom effect applied to camera {camera.name}");
+        Plugin.Log.LogInfo(
+            $"Bloom: Ultimate Bloom effect applied to camera {cameraName ?? _ultimateBloom.name}");
+        return true;
+    }
 
-        var weather = GameObject.Find("Weather");
-        
-        if (weather == null)
-            return;
-        
-        _weatherController = weather.GetComponent<WeatherController>();
+    private static bool Populated(float[] array, int minimumLength = 1)
+    {
+        return array != null && array.Length >= minimumLength;
+    }
+
+    private static bool Populated(bool[] array, int minimumLength = 1)
+    {
+        return array != null && array.Length >= minimumLength;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -107,6 +172,12 @@ public class Bloom
     
     public void UpdateSettings()
     {
+        // Same guard AmbientOcclusion.UpdateSettings already had. This is reachable with
+        // no component at all: the constructor returns early when there is no camera, and
+        // GraphicsController's `_bloom?.` null-conditionals only cover a null Bloom, not a
+        // Bloom holding a null UltimateBloom. Config-UI handlers call in here too.
+        if (_ultimateBloom == null) return;
+
         var config = Plugin.GraphicsConfig.Bloom;
         
         _ultimateBloom.m_BloomIntensity = config.BloomIntensity.Value;
@@ -132,6 +203,8 @@ public class Bloom
 
     public void UpdateLensDust()
     {
+        if (_ultimateBloom == null) return;
+
         var config = Plugin.GraphicsConfig.Bloom;
         
         if (config.LensDust.Value == null)
@@ -156,10 +229,9 @@ public class Bloom
     
     private static void ResetIntensities(float[] intensities)
     {
-        // AddComponent<UltimateBloom>() hasn't run its own Start()/Awake() yet at this
-        // point (that's next Unity lifecycle tick, not synchronous with AddComponent),
-        // so on a camera that didn't already carry a fully-serialized UltimateBloom
-        // (ours doesn't ship one), these intensity arrays are still null here.
+        // TryConfigure gates on this now, so a null here would be a caller bug rather
+        // than the normal not-started-yet case it used to absorb. Kept anyway - it is
+        // one branch, and silently doing nothing beats an NRE from a static helper.
         if (intensities == null) return;
         for (var i = 0; i < intensities.Length; i++)
         {
