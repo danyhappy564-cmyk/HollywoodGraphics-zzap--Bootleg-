@@ -1,9 +1,9 @@
-using EFT.CameraControl;
-﻿using UnityEngine.Rendering.PostProcessing;
+﻿using EFT.CameraControl;
+using UnityEngine.Rendering.PostProcessing;
 
 namespace HollywoodGraphics.Components;
 
-public class HfxMotionBlur
+public static class HfxMotionBlur
 {
     public static void UpdateSettings()
     {

@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using EFT.CameraControl;
 using EFT.Weather;
 using UnityEngine;
 using EFT.CameraControl;

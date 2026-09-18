@@ -14,7 +14,7 @@ namespace HollywoodGraphics;
 [SuppressMessage("ReSharper", "MemberCanBePrivate.Global")]
 public class Plugin : BaseUnityPlugin
 {
-    public const string MajorMinorVersion = "2.0";
+    public const string MajorMinorVersion = "3.0";
     public const string HollywoodGraphicsVersion = $"{MajorMinorVersion}.0";
     public static ManualLogSource Log;
 
@@ -24,7 +24,7 @@ public class Plugin : BaseUnityPlugin
     
     // Required by HFX integration, but there's no locally detectable usage so Rider yells at us
     // ReSharper disable once UnusedMember.Global
-    public static ConfigEntry<float> lensDustIntensity => GraphicsConfig.Bloom.DustIntensity;
+    public static ConfigEntry<float> LensDustIntensity => GraphicsConfig.Bloom.DustIntensity;
 
     private void Awake()
     {

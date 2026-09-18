@@ -1,5 +1,5 @@
+﻿using EFT.CameraControl;
 using UnityEngine;
-using EFT.CameraControl;
 
 namespace HollywoodGraphics.Components;
 
