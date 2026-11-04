@@ -1,3 +1,8 @@
+<p align="center">
+  <a href="README.md"><img alt="한국어 (현재 문서)" src="https://img.shields.io/badge/%ED%95%9C%EA%B5%AD%EC%96%B4-%ED%98%84%EC%9E%AC%20%EB%AC%B8%EC%84%9C-1f6feb?style=for-the-badge"></a>
+  <a href="README.en.md"><img alt="English" src="https://img.shields.io/badge/English-Read%20in%20English-6e7681?style=for-the-badge"></a>
+</p>
+
 ### ⚠️ IMPORTANT NOTICE / DISCLAIMER
 
 - **Original Author:** SleepingPills
@@ -16,7 +21,7 @@
 
 ## 변경 이력
 
-- 2026-10-13 04:46 — README 맨 위 원작자 표기를 한 줄씩 나눠 보기 쉽게 정리 (내용 변화 없음)
+전체 변경 이력 1개는 [`changelog/`](changelog/) 폴더에 10개씩 나눠 있습니다 (번호가 클수록 최신, 최신 파일: [`CHANGELOG-001.md`](changelog/CHANGELOG-001.md)). 릴리즈별 요약은 [Releases](../../releases).
 
 # HollywoodGraphics (SPT 4.1.5)
 
